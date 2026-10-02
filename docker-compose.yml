@@ -1,0 +1,254 @@
+version: '3.8'
+
+services:
+  # 1. Magento Application Container (PHP-FPM 8.2 & Composer & CLI)
+  magento:
+    build:
+      context: .
+      dockerfile: docker/magento/Dockerfile
+      target: development
+    image: magento2-app:dev
+    container_name: magento2-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    environment:
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - MYSQL_HOST=${MYSQL_HOST:-mysql}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-magento2}
+      - MYSQL_USER=${MYSQL_USER:-magento}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-magento_local_dev_pass123!}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - OPENSEARCH_HOST=${OPENSEARCH_HOST:-opensearch}
+      - OPENSEARCH_PORT=${OPENSEARCH_PORT:-9200}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USER=${RABBITMQ_USER:-guest}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - ./src:/var/www/html
+      - ./docker/magento/php.ini:/usr/local/etc/php/conf.d/99-custom.ini:ro
+      - ./docker/magento/opcache.ini:/usr/local/etc/php/conf.d/10-opcache.ini:ro
+      - ./docker/magento/www.conf:/usr/local/etc/php-fpm.d/zz-custom.conf:ro
+      - magento-media:/var/www/html/pub/media
+      - magento-static:/var/www/html/pub/static
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - magento-net
+
+  # 2. Nginx Web Server (Serves /pub and proxies fastcgi to PHP-FPM)
+  nginx:
+    image: nginx:1.26-alpine
+    container_name: magento2-nginx
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    volumes:
+      - ./src:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - magento-media:/var/www/html/pub/media:ro
+      - magento-static:/var/www/html/pub/static:ro
+    depends_on:
+      - magento
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/health_check.php || exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - magento-net
+
+  # 3. MySQL Database (MySQL 8.0)
+  mysql:
+    image: mysql:8.0.36
+    container_name: magento2-mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --sql-mode=""
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_local_dev_pass123!}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-magento2}
+      MYSQL_USER: ${MYSQL_USER:-magento}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-magento_local_dev_pass123!}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/custom.cnf:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_local_dev_pass123!}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - magento-net
+
+  # 4. phpMyAdmin (Web-based MySQL Admin Interface)
+  # NOTE: Strictly for database operations. NEVER store credentials or secrets in tables!
+  phpmyadmin:
+    image: phpmyadmin:5.2.1-apache
+    container_name: magento2-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-magento}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-magento_local_dev_pass123!}
+      UPLOAD_LIMIT: 256M
+    volumes:
+      - ./docker/phpmyadmin/config.user.inc.php:/etc/phpmyadmin/config.user.inc.php:ro
+    ports:
+      - "${PHPMYADMIN_PORT:-8081}:80"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - magento-net
+
+  # 5. Redis (In-memory Cache, Full Page Cache & Session store)
+  redis:
+    image: redis:7.2-alpine
+    container_name: magento2-redis
+    restart: unless-stopped
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    volumes:
+      - redis-data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - magento-net
+
+  # 6. OpenSearch (Catalog Search Engine - Required for Magento 2.4.7)
+  opensearch:
+    image: opensearchproject/opensearch:2.12.0
+    container_name: magento2-opensearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms1024m -Xmx1024m"
+      - bootstrap.memory_lock=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+      - ./docker/opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -f http://localhost:9200/_cat/health | grep -q 'green\\|yellow'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - magento-net
+
+  # 7. RabbitMQ (Message Broker for asynchronous queues and consumer jobs)
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: magento2-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-/}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - ./docker/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    ports:
+      - "5672:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - magento-net
+
+  # 8. Prometheus Server (Metrics Collection & Alerting)
+  prometheus:
+    build:
+      context: .
+      dockerfile: monitoring/prometheus/Dockerfile
+    image: magento2-prometheus:latest
+    container_name: magento2-prometheus
+    restart: unless-stopped
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - prometheus-data:/prometheus
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+    networks:
+      - magento-net
+
+  # 9. Grafana Visual Dashboard (Analytics & Alert Visualizer)
+  grafana:
+    build:
+      context: .
+      dockerfile: monitoring/grafana/Dockerfile
+    image: magento2-grafana:latest
+    container_name: magento2-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-GrafanaAdminSecurePass123!}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - magento-net
+
+networks:
+  magento-net:
+    driver: bridge
+    name: magento2-network
+
+volumes:
+  mysql-data:
+    name: magento2-mysql-data
+  redis-data:
+    name: magento2-redis-data
+  opensearch-data:
+    name: magento2-opensearch-data
+  rabbitmq-data:
+    name: magento2-rabbitmq-data
+  magento-media:
+    name: magento2-media-data
+  magento-static:
+    name: magento2-static-data
+  prometheus-data:
+    name: magento2-prometheus-data
+  grafana-data:
+    name: magento2-grafana-data
