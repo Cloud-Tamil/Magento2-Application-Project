@@ -1,0 +1,20 @@
+# ==============================================================================
+# OpenSearch 2.12 Configuration for Magento 2.4.7 Catalog Search
+# ==============================================================================
+cluster.name: magento2-opensearch-cluster
+node.name: magento2-node-1
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9600
+
+discovery.type: single-node
+bootstrap.memory_lock: true
+
+# Security Plugin configuration for development
+plugins.security.disabled: true
+plugins.security.ssl.http.enabled: false
+plugins.security.ssl.transport.enabled: false
+
+# Indices and Cache
+indices.query.bool.max_clause_count: 4096
+indices.memory.index_buffer_size: 20%
