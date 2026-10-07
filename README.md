@@ -105,10 +105,24 @@ This application is an enterprise-grade e-commerce stack powered by **Magento 2.
 | **phpMyAdmin Console** | `http://localhost:8081` | `8081` | `magento` | `Welcome@1234` | Interactive DB inspection (Root: `Welcome@1234`) |
 | **Grafana Dashboards** | `http://localhost:3001` | `3001` | `admin` | `Welcome@12345` | Visual analytics & alert manager |
 | **Prometheus Metrics** | `http://localhost:9090` | `9090` | *Public* | *N/A* | Time-series metrics & scraping engine |
-| **RabbitMQ Management** | `http://localhost:15672` | `15672` | `guest` | `Welcome@1234` | Queue throughput & consumer monitor |
+| **RabbitMQ Management** | `http://localhost:15672` | `15672` | `guest` | `Welcome@12345` | Queue throughput & consumer monitor |
 | **MySQL Database Port** | `localhost:3306` | `3306` | `magento` | `Welcome@1234` | Direct SQL connection (`magento2` DB) |
-| **Redis Cache Port** | `localhost:6379` | `6379` | *default* | `Welcome@1234` | Authenticated Redis CLI / FPC store |
+| **Redis Cache Port** | `localhost:6379` | `6379` | *default* | `Welcome@1234` | Authenticated Redis CLI (`requirepass`) |
 | **OpenSearch REST API** | `http://localhost:9200` | `9200` | *No Auth* | *N/A* | Catalog query and index cluster API |
+
+### 🔑 Verified Single Source of Truth Credentials
+
+| Account / Service | Username | Password | Email / Details | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Magento Admin (Main)** | `admin` | `Welcome@12345` | `sktamilvb@gmail.com` | Storefront administrator access at `/admin_control` |
+| **Store 2 Admin (B2B)** | `admin` | `Welcome@12345` | `sktamilvb@gmail.com` | B2B store manager access |
+| **Store 3 Admin (EU)** | `admin` | `Welcome@12345` | `sktamilvb@gmail.com` | International store manager access |
+| **MySQL Application User** | `magento` | `Welcome@1234` | DB: `magento2` | Connection string for Magento PHP runtime |
+| **MySQL Root User** | `root` | `Welcome@1234` | All DBs | Administrative migrations, dumps & restores |
+| **Redis In-Memory Auth** | *(token)* | `Welcome@1234` | Port: `6379` | Enforced via `requirepass` in `redis.conf` |
+| **RabbitMQ Broker** | `guest` | `Welcome@12345` | Vhost: `/` | AMQP port `5672` & Management UI `15672` |
+| **Grafana Dashboard** | `admin` | `Welcome@12345` | Port: `3001` | Real-time monitoring portal |
+| **phpMyAdmin Console** | `magento` | `Welcome@1234` | Port: `8081` | Web database explorer |
 
 > 🔒 **Security Mandate:** Never store production secrets in database tables or Git repositories. Local development uses `.env` (gitignored). Production AWS EKS injects credentials dynamically from **AWS Secrets Manager** via IAM Roles for Service Accounts (IRSA).
 
