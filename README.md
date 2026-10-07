@@ -661,6 +661,6 @@ To deploy new code without interrupting shopping carts:
 ---
 
 ## 📄 License & Maintainer
-- **Maintained by:** Enterprise DevOps Team (`sktamilvb@gmail.com`)
+- **Maintained by:** `Tamilselvan.M`
 - **Repository:** `https://github.com/Cloud-Tamil/Magento2-Application-Project.git`
 - **License:** OSL-3.0 / AFL-3.0
