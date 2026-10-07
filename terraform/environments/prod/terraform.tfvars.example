@@ -1,0 +1,6 @@
+aws_region      = "us-east-1"
+environment     = "prod"
+cluster_name    = "magento-prod-eks"
+domain_name     = "shop.enterprise-magento.com"
+route53_zone_id = "Z123456789EXAMPLE"
+account_id      = "123456789012"
