@@ -1,0 +1,15 @@
+apiVersion: v2
+name: magento
+description: Enterprise Production Helm Chart for Magento 2.4.7 on AWS EKS
+type: application
+version: 1.0.0
+appVersion: "2.4.7"
+maintainers:
+  - name: Enterprise DevOps Team
+    email: devops@enterprise.com
+keywords:
+  - magento
+  - ecommerce
+  - kubernetes
+  - aws
+  - eks

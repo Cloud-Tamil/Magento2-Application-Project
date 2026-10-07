@@ -1,0 +1,42 @@
+{{- if .Values.cron.enabled -}}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "magento.fullname" . }}-cron
+  labels:
+    {{- include "magento.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cron.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            {{- include "magento.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: cronjob
+        spec:
+          serviceAccountName: {{ .Values.serviceAccount.name }}
+          restartPolicy: OnFailure
+          containers:
+            - name: cron
+              image: "{{ .Values.image.app.repository }}:{{ .Values.image.app.tag }}"
+              command: ["/bin/sh", "-c", "php -d memory_limit=2048M bin/magento cron:run"]
+              envFrom:
+                - configMapRef:
+                    name: {{ include "magento.fullname" . }}-config
+                - secretRef:
+                    name: {{ include "magento.fullname" . }}-secrets
+              resources:
+                {{- toYaml .Values.cron.resources | nindent 16 }}
+              volumeMounts:
+                - name: media-storage
+                  mountPath: /var/www/html/pub/media
+          volumes:
+            - name: media-storage
+              persistentVolumeClaim:
+                claimName: {{ include "magento.fullname" . }}-media-pvc
+{{- end }}

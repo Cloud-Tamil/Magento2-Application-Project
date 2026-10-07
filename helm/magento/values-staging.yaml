@@ -1,0 +1,42 @@
+# ==============================================================================
+# Staging Environment Override Values
+# ==============================================================================
+replicaCount: 2
+
+resources:
+  nginx:
+    requests:
+      cpu: 150m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  app:
+    requests:
+      cpu: 1000m
+      memory: 2048Mi
+    limits:
+      cpu: 2000m
+      memory: 3072Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+config:
+  appEnv: "staging"
+  mageMode: "production"
+  appUrl: "https://staging.shop.enterprise-magento.com"
+  mysql:
+    database: "magento2_staging"
+  opensearch:
+    indexPrefix: "magento2_staging"
+
+persistence:
+  media:
+    size: 50Gi

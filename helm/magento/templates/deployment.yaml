@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "magento.fullname" . }}-web
+  labels:
+    {{- include "magento.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "magento.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "magento.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      terminationGracePeriodSeconds: 60
+      containers:
+        # Nginx Container
+        - name: nginx
+          image: "{{ .Values.image.nginx.repository }}:{{ .Values.image.nginx.tag }}"
+          imagePullPolicy: {{ .Values.image.nginx.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources.nginx | nindent 12 }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+              readOnly: true
+            - name: media-storage
+              mountPath: /var/www/html/pub/media
+            - name: static-storage
+              mountPath: /var/www/html/pub/static
+          readinessProbe:
+            httpGet:
+              path: /health_check.php
+              port: 80
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health_check.php
+              port: 80
+            periodSeconds: 15
+            timeoutSeconds: 5
+
+        # PHP-FPM Application Container
+        - name: php-fpm
+          image: "{{ .Values.image.app.repository }}:{{ .Values.image.app.tag }}"
+          imagePullPolicy: {{ .Values.image.app.pullPolicy }}
+          ports:
+            - name: fpm
+              containerPort: 9000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "magento.fullname" . }}-config
+            - secretRef:
+                name: {{ include "magento.fullname" . }}-secrets
+          resources:
+            {{- toYaml .Values.resources.app | nindent 12 }}
+          volumeMounts:
+            - name: media-storage
+              mountPath: /var/www/html/pub/media
+            - name: static-storage
+              mountPath: /var/www/html/pub/static
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "cgi-fcgi -bind -connect 127.0.0.1:9000 || exit 0"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "cgi-fcgi -bind -connect 127.0.0.1:9000 || exit 0"]
+            periodSeconds: 20
+
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: {{ include "magento.fullname" . }}-nginx-config
+        - name: media-storage
+          persistentVolumeClaim:
+            claimName: {{ include "magento.fullname" . }}-media-pvc
+        - name: static-storage
+          emptyDir: {}

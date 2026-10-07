@@ -1,0 +1,39 @@
+# ==============================================================================
+# Development Environment Override Values
+# ==============================================================================
+replicaCount: 1
+
+resources:
+  nginx:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  app:
+    requests:
+      cpu: 500m
+      memory: 1024Mi
+    limits:
+      cpu: 1000m
+      memory: 2048Mi
+
+autoscaling:
+  enabled: false
+
+pdb:
+  enabled: false
+
+config:
+  appEnv: "development"
+  mageMode: "developer"
+  appUrl: "https://dev.shop.enterprise-magento.com"
+  mysql:
+    database: "magento2_dev"
+  opensearch:
+    indexPrefix: "magento2_dev"
+
+persistence:
+  media:
+    size: 20Gi
