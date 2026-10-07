@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: magento-cron
+  namespace: magento
+  labels:
+    app.kubernetes.io/name: magento2
+    app.kubernetes.io/component: cronjob
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: magento2
+            app.kubernetes.io/component: cronjob
+        spec:
+          serviceAccountName: magento-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: magento-cron
+              image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/magento2-app:2.4.7
+              command:
+                - /bin/sh
+                - -c
+                - "php -d memory_limit=2048M bin/magento cron:run"
+              envFrom:
+                - configMapRef:
+                    name: magento-config
+                - secretRef:
+                    name: magento-secrets
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1024Mi
+                limits:
+                  cpu: 1000m
+                  memory: 2048Mi
+              volumeMounts:
+                - name: media-storage
+                  mountPath: /var/www/html/pub/media
+                - name: magento-env
+                  mountPath: /var/www/html/app/etc/env.php
+                  subPath: env.php
+                  readOnly: true
+          volumes:
+            - name: media-storage
+              persistentVolumeClaim:
+                claimName: magento-media-pvc
+            - name: magento-env
+              secret:
+                secretName: magento-env-php
+                optional: true
