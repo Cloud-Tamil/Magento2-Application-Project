@@ -1,0 +1,54 @@
+# ==============================================================================
+# Prometheus 2.52 Configuration for Magento 2 Infrastructure
+# ==============================================================================
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  scrape_timeout: 10s
+
+# Alerting rules configuration
+rule_files:
+  - "/etc/prometheus/alerts.yml"
+
+scrape_configs:
+  # 1. Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # 2. Nginx Web Server Metrics (Stub status & fastcgi response times)
+  - job_name: "magento-nginx"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["nginx:80"]
+
+  # 3. PHP-FPM Worker Pool Metrics (Active/Idle workers, listen queue length)
+  - job_name: "magento-php-fpm"
+    metrics_path: "/status"
+    params:
+      json: [""]
+    static_configs:
+      - targets: ["magento:9000"]
+
+  # 4. MySQL 8.0 Metrics (Queries/sec, InnoDB buffer pool hit ratio, slow queries)
+  - job_name: "magento-mysql"
+    static_configs:
+      - targets: ["mysql:3306"]
+
+  # 5. Redis Cache & Session Metrics (Key hits, evictions, memory usage)
+  - job_name: "magento-redis"
+    static_configs:
+      - targets: ["redis:6379"]
+
+  # 6. OpenSearch Search Engine Metrics (Cluster state, JVM heap, search latency)
+  - job_name: "magento-opensearch"
+    metrics_path: "/_nodes/stats"
+    static_configs:
+      - targets: ["opensearch:9200"]
+
+  # 7. RabbitMQ Message Queue Metrics (Queue depth, consumer count, message rates)
+  # RabbitMQ 3.13 includes native Prometheus metrics on port 15692
+  - job_name: "magento-rabbitmq"
+    metrics_path: "/metrics"
+    static_configs:
+      - targets: ["rabbitmq:15692"]

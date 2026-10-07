@@ -1,0 +1,71 @@
+# ==============================================================================
+# Prometheus Alerting Rules for Magento 2 Production Infrastructure
+# ==============================================================================
+groups:
+  - name: magento_ecommerce_alerts
+    rules:
+      # 1. Magento Web Storefront Outage
+      - alert: MagentoServiceDown
+        expr: up{job="magento-nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          tier: frontend
+        annotations:
+          summary: "Magento Nginx web server is unreachable"
+          description: "Magento web service has been down for more than 1 minute."
+
+      # 2. PHP-FPM Worker Pool Exhaustion
+      - alert: PhpFpmWorkersExhausted
+        expr: (php_fpm_active_processes / (php_fpm_active_processes + php_fpm_idle_processes)) > 0.85
+        for: 2m
+        labels:
+          severity: warning
+          tier: application
+        annotations:
+          summary: "PHP-FPM active workers exceed 85% capacity"
+          description: "PHP worker pool is near exhaustion, which may cause HTTP 502/504 errors on storefront."
+
+      # 3. High HTTP 5xx Error Rate
+      - alert: HighHttp5xxRate
+        expr: rate(nginx_http_requests_total{status=~"^5.."}[5m]) > 5
+        for: 2m
+        labels:
+          severity: critical
+          tier: frontend
+        annotations:
+          summary: "High 5xx error rate detected on Magento storefront"
+          description: "More than 5 HTTP 5xx responses per second over the last 5 minutes."
+
+      # 4. Redis Memory Usage Near Threshold
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 3m
+        labels:
+          severity: warning
+          tier: cache
+        annotations:
+          summary: "Redis memory usage exceeds 85%"
+          description: "Redis cache memory saturation may cause aggressive key eviction or session drop."
+
+      # 5. OpenSearch Cluster Red or Yellow
+      - alert: OpenSearchClusterDegraded
+        expr: opensearch_cluster_status{status="red"} == 1 or opensearch_cluster_status{status="yellow"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          tier: search
+        annotations:
+          summary: "OpenSearch cluster health is degraded"
+          description: "OpenSearch cluster status is RED or YELLOW. Catalog search queries may fail."
+
+      # 6. RabbitMQ Queue Unprocessed Message Backlog
+      - alert: RabbitMqQueueBacklogHigh
+        expr: rabbitmq_queue_messages_ready > 5000
+        for: 5m
+        labels:
+          severity: warning
+          tier: messaging
+        annotations:
+          summary: "RabbitMQ message backlog exceeds 5,000 messages"
+          description: "Background queue consumers may be stuck or overwhelmed by transaction volume."

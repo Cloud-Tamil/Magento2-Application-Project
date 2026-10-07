@@ -1,0 +1,16 @@
+# ==============================================================================
+# Grafana Dashboards Provisioning Provider
+# Automatically loads dashboards from /var/lib/grafana/dashboards
+# ==============================================================================
+apiVersion: 1
+
+providers:
+  - name: 'magento2-dashboards'
+    orgId: 1
+    folder: 'Magento 2 E-Commerce'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
