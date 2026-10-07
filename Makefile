@@ -108,3 +108,15 @@ monitoring-down:
 
 monitoring-logs:
 	docker compose logs -f prometheus grafana
+
+optimize:
+	chmod +x scripts/optimize.sh
+	./scripts/optimize.sh
+
+backup:
+	chmod +x scripts/backup.sh
+	./scripts/backup.sh
+
+restore:
+	chmod +x scripts/restore.sh
+	./scripts/restore.sh $(FILE)
